@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-### Patch note
+### Patch note 
 #     Mk1   Smooth contour detecting    IMPROVED
 #           Smooth line moving          IMPROVED
 #           Smooth rectangle drawing    ADDED
