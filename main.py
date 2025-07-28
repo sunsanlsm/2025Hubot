@@ -19,7 +19,7 @@
 
 
 
-import Hubot as h
+import hubot as h
 
 if __name__ == '__main__':
     hubot = h.Hubot()
