@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
-### Patch note 
-#     Mk1   Smooth contour detecting    IMPROVED
+### Patch note
+#   Mk1     Smooth contour detecting    IMPROVED
 #           Smooth line moving          IMPROVED
 #           Smooth rectangle drawing    ADDED
 #           Right angle detecting       ADDED
@@ -10,23 +10,27 @@
 #           Max Verstappen height       ADDED
 #           Serial Open to Close        REMOVED
 #           Line detecting method       IMPROVED
+#   Mk2     Screen color spoid          ADDED
+#           Serial Open to Close        ADDED
+#           Gaussianblur                IMPROVED
 
 
 
 import numpy as np
 import cv2
 import serial
+import copy as c
 
 
 
 class Hubot:
     def __init__(self):
-        # self.ser = serial.Serial(port="/dev/ttyUSB0",
-        #                          baudrate=57600,
-        #                          parity=serial.PARITY_NONE,
-        #                          stopbits=serial.STOPBITS_ONE,
-        #                          bytesize=serial.EIGHTBITS,
-        #                          timeout=0)
+        self.ser = serial.Serial(port='com4',
+                                 baudrate=57600,
+                                 parity=serial.PARITY_NONE,
+                                 stopbits=serial.STOPBITS_ONE,
+                                 bytesize=serial.EIGHTBITS,
+                                 timeout=0)
         
         self.cap = cv2.VideoCapture(0)
         self.cam_w = 0
@@ -37,22 +41,18 @@ class Hubot:
         self.MIN_RIGHT_WIDTH = 300
 #       self.MAX_VERSTAPPEN_HEIGHT = 181
 
-        # self.MIN_LINE_HSV = np.array([20, 35, 10])
-        # self.MAX_LINE_HSV = np.array([75, 255, 220])
+        self.min_line_HSV = np.array([20, 125, 50])
+        self.max_line_HSV = np.array([100, 255, 220])
+        self.min_object_HSV = np.array([120, 125, 50])
+        self.max_object_HSV = np.array([160, 255, 150])
 
-        self.MIN_LINE_HSV = np.array([20, 125, 50])
-        self.MAX_LINE_HSV = np.array([75, 255, 220])
-        self.MIN_OBJECT_HSV = np.array([100, 125, 50])
-        self.MAX_OBJECT_HSV = np.array([160, 255, 150])
-
-        self.LOWER_LINE_MASK_LIMIT = 1/2
-        self.UPPER_LINE_MASK_LIMIT = 0
+        self.LOWER_LINE_MASK_LIMIT = 2/3
+        self.UPPER_LINE_MASK_LIMIT = 1/4
         self.CURRENT_LINE_POS = 3/4
         self.LOWER_OBJECT_MASK_LIMIT = 2/4
         self.UPPER_OBJECT_MASK_LIMIT = 1/8
     
         self.MAX_LINE_STACK = 10
-        self.object_stack = []
 
         self.line_BGR = (0, 255, 255)
         self.object_BGR = (255, 255, 0)
@@ -71,10 +71,102 @@ class Hubot:
         self.obj_stackY2 = []
         self.obj_lineX = []
 
+        self.mouse_press = False
 
 
-    # def serial_write(self, num):
-    #     self.ser.write(bytearray([255, 85, num, 255-num, 0, 255]))
+
+    def mouse_event(self, event, x, y, _, dst):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            if self.mouse_press == False:
+                self.mouse_press = True
+                print('LB pressed!')
+                picked = dst[y, x]
+                print('\n', picked)
+                self.leftB(picked)
+            else:
+                print('Other eventis continuing yet!')
+                return
+            
+        elif event == cv2.EVENT_LBUTTONDOWN:
+            if self.mouse_press == False:
+                self.mouse_press = True
+                print('RB pressed!')
+                picked = dst[y, x]
+                print('\n', picked)
+                self.rightB(picked)
+            else:
+                print('Other event is continuing yet!')
+                return
+
+        else:
+            self.mouse_press = False
+            pass
+
+
+    def leftB(self, picked):
+        keybound = cv2.waitKey(0)
+
+        if keybound == ord('l'):
+            latest = c.copy(self.min_line_HSV)
+            print(self.min_line_HSV)
+
+            for i in range(3):
+                if picked[i] < self.min_line_HSV[i]:
+                    self.min_line_HSV[i] = picked[i]
+
+            msg = 'min_ln_HSV was Changed from', latest, 'to', self.min_line_HSV, '!'
+            print(msg)
+
+        elif keybound == ord('o'):
+            latest = c.copy(self.min_object_HSV)
+            print(self.min_object_HSV)
+
+            for i in range(3):
+                if picked[i] < self.min_object_HSV[i]:
+                    self.min_object_HSV[i] = picked[i]
+
+            msg = 'min_obj_HSV was Changed from', latest, 'to', self.min_line_HSV, '!'
+            print(msg)
+
+        else:
+            print('Press "L" for line or "O" for object!')
+            self.mouse_press = False
+
+
+    def rightB(self, picked):
+        keybound = cv2.waitKey(0)
+
+        if keybound == ord('l'):
+            latest = c.copy(self.max_line_HSV)
+            print(self.max_line_HSV)
+
+            for i in range(3):
+                if picked[i] > self.max_line_HSV[i]:
+                    self.max_line_HSV[i] = picked[i]
+
+            msg = 'max_ln_HSV was Changed from', latest, 'to', self.max_line_HSV,'!'
+            print(msg)
+
+        elif keybound == ord('o'):
+            latest = c.copy(self.max_object_HSV)
+            print(self.max_object_HSV)
+
+            for i in range(3):
+                if picked[i] > self.max_object_HSV[i]:
+                    self.max_object_HSV[i] = picked[i]
+
+            msg = 'max_obj_HSV was Changed from', latest, 'to', self.max_line_HSV, '!'
+            print(msg)
+
+        else:
+            print('Press "L" for line or "O" for object!')
+
+        self.mouse_press = False
+
+
+
+    def serial_write(self, num):
+        self.ser.write(bytearray([255, 85, num, 255-num, 0, 255]))
 
 
 
@@ -132,7 +224,6 @@ class Hubot:
         rect_pos = self.stacks(cont_pos[0], inv)
 
         cv2.line(dst, (int(self.cam_w/2), int(self.cam_h*self.CURRENT_LINE_POS)), rect_pos[2], cont_pos[0][4], 1, cv2.LINE_AA)
-
         cv2.rectangle(dst, rect_pos[0], rect_pos[1], cont_pos[0][4], 2)
 
         self.ln_stack = rect_pos[2]
@@ -192,9 +283,6 @@ class Hubot:
 
         for i in range(0, len(self.ln_stackX1)*5, 5):
             weight = np.append(weight, i+1)
-
-        # print(ln_line)
-        # print(weight)
 
         avgX1 = int(np.average(ln_X1, weights=weight))
         avgY1 = int(np.average(ln_Y1, weights=weight))
@@ -260,9 +348,6 @@ class Hubot:
         for i in range(0, len(self.obj_stackX1)*5, 5):
             weight = np.append(weight, i+1)
 
-        # print(obj_line)
-        # print(weight)
-
         avgX1 = int(np.average(obj_X1, weights=weight))
         avgY1 = int(np.average(obj_Y1, weights=weight))
         avgX2 = int(np.average(obj_X2, weights=weight))
@@ -284,6 +369,7 @@ class Hubot:
 
     def get_offset(self, theta, offset_limit =75):
         offset = int((theta ** 3) / (1024 * 2))
+        # offset = int(theta * 1024/750)
         if offset <= -offset_limit:
             return 0
         if offset >= offset_limit:
@@ -295,16 +381,15 @@ class Hubot:
     def main(self):
         cam_res, dst = self.cap.read()
         if cam_res == False:
-            print("CameraError: Cannot capture camera")
-            return False
+            print('CameraError: Cannot capture camera')
+            return 
         
-        dst = cv2.GaussianBlur(dst, (0, 0), 5)
+        dst = cv2.GaussianBlur(dst, (0, 0), 2)
         hsv = cv2.cvtColor(dst, cv2.COLOR_BGR2HSV)
         self.cam_h, self.cam_w = dst.shape[:2]
 
-        line_mask = cv2.inRange(hsv, self.MIN_LINE_HSV, self.MAX_LINE_HSV)
-        object_mask = cv2.inRange(hsv, self.MIN_OBJECT_HSV, self.MAX_OBJECT_HSV)
-
+        line_mask = cv2.inRange(hsv, self.min_line_HSV, self.max_line_HSV)
+        object_mask = cv2.inRange(hsv, self.min_object_HSV, self.max_object_HSV)
         line_mask[int(self.cam_h*self.LOWER_LINE_MASK_LIMIT):self.cam_h, :] = 0
         line_mask[0:int(self.cam_h*self.UPPER_LINE_MASK_LIMIT), :] = 0
         object_mask[int(self.cam_h*self.LOWER_OBJECT_MASK_LIMIT):self.cam_h, :] = 0
@@ -316,13 +401,20 @@ class Hubot:
         cv2.rectangle(dst, (0, int(self.cam_h*self.UPPER_LINE_MASK_LIMIT)), (self.cam_w, int(self.cam_h*self.LOWER_LINE_MASK_LIMIT)), self.line_BGR, 1)
         cv2.rectangle(dst, (0, int(self.cam_h*self.UPPER_OBJECT_MASK_LIMIT)), (self.cam_w, int(self.cam_h*self.LOWER_OBJECT_MASK_LIMIT)), self.object_BGR, 1)
 
-        cv2.imshow("dst", dst)
-        cv2.waitKey(1)
+        cv2.imshow('dst', dst)
+        cv2.imshow('line',line_mask)
+        cv2.imshow('object', object_mask)
+        key = cv2.waitKey(1)
+        if key == ord('q'):
+            print("Pressed Q")
+            return False
+
+        # cv2.setMouseCallback('dst', self.mouse_event, dst)
 
         # Object detected
         if object_res == True:
-            # self.serial_write(200)
-            print("Object detected.\tWritten on Serial:", 200)
+            self.serial_write(200)
+            print('Object detected.\tWritten on Serial:', 200)
             return True
 
         # Line detected
@@ -331,16 +423,16 @@ class Hubot:
             offset = self.get_offset(theta)
 
             try:
-                # self.serial_write(offset)
-                print("Theta: ", theta, "\tWritten on serial:", offset)
+                self.serial_write(offset)
+                print('Theta: ', theta, '\tWritten on serial:', offset)
                 return True
             except Exception as e:
-                print("SerialError:", str(e))
+                print('SerialError:', str(e))
                 return False
 
         # Line not detected
         else:
-            print("Line not detected.")
+            # print('Line not detected.')
             return True
 
 
@@ -351,16 +443,16 @@ class Hubot:
                 if self.main() == False:
                     break
         except KeyboardInterrupt:
-            print("Pressed Ctrl+C")
+            print('Pressed Ctrl+C')
         # except Exception as e:
-        #     print("UnexpectedError:", str(e))
+        #     print('UnexpectedError:', str(e))
         finally:
             self.cap.release()
             cv2.destroyAllWindows()
-            # self.ser.close()
+            self.ser.close()
 
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     hubot = Hubot()
     hubot.run()
